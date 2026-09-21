@@ -1,0 +1,195 @@
+# ============================================================
+# PHASE 3 — MCP TOOL SECURITY
+# ============================================================
+
+tools:
+
+  # ----------------------------------------------------------
+  # Authentication
+  # ----------------------------------------------------------
+
+  authenticate_user_session:
+
+    enabled: true
+
+    parameters: {}
+
+    additional_parameters: false
+
+
+  # ----------------------------------------------------------
+  # Permission Verification
+  # ----------------------------------------------------------
+
+  verify_permission:
+
+    enabled: true
+
+    parameters: {}
+
+    additional_parameters: false
+
+
+  # ----------------------------------------------------------
+  # Database Write
+  # ----------------------------------------------------------
+
+  execute_db_write:
+
+    enabled: true
+
+    parameters:
+
+      record_id:
+        type: integer
+        required: true
+
+      value:
+        type: string
+        required: true
+
+    additional_parameters: false
+
+
+  # ----------------------------------------------------------
+  # Get User
+  # ----------------------------------------------------------
+
+  get_user:
+
+    enabled: true
+
+    parameters:
+
+      user_id:
+        type: integer
+        required: true
+
+    additional_parameters: false
+
+
+  # ----------------------------------------------------------
+  # Get Order
+  # ----------------------------------------------------------
+
+  get_order:
+
+    enabled: true
+
+    parameters:
+
+      order_id:
+        type: integer
+        required: true
+
+    additional_parameters: false
+
+
+  # ----------------------------------------------------------
+  # Refund
+  # ----------------------------------------------------------
+
+  refund:
+
+    enabled: true
+
+    parameters:
+
+      refund_amount:
+        type: number
+        required: true
+        min: 0
+        max: 100.00
+
+    additional_parameters: false
+
+  # ----------------------------------------------------------
+  # egress
+  # ----------------------------------------------------------
+
+# ============================================================
+# PHASE 4 — STATE MACHINE
+# ============================================================
+
+state_machine:
+
+  # ----------------------------------------------------------
+  # State 1
+  # UNAUTHENTICATED → AUTHENTICATED
+  # ----------------------------------------------------------
+
+  authenticate_user_session:
+
+    required_state: UNAUTHENTICATED
+
+    next_state: AUTHENTICATED
+
+
+  # ----------------------------------------------------------
+  # State 2
+  # AUTHENTICATED → AUTHORIZED
+  # ----------------------------------------------------------
+
+  verify_permission:
+
+    required_state: AUTHENTICATED
+
+    next_state: AUTHORIZED
+
+
+  # ----------------------------------------------------------
+  # State 3
+  # AUTHORIZED → ACTION_EXECUTED
+  # ----------------------------------------------------------
+
+  execute_db_write:
+
+    required_state: AUTHORIZED
+
+    next_state: ACTION_EXECUTED
+# ============================================================
+# PHASE 5 — AUTHORIZATION
+# ============================================================
+
+authorization:
+
+  roles:
+
+    student:
+      allowed_tools:
+        - get_user
+        - get_order
+
+    admin:
+      allowed_tools:
+        - get_user
+        - get_order
+        - refund
+        - authenticate_user_session
+        - verify_permission
+        - execute_db_write
+# ============================================================
+# PHASE 5 — RISK CLASSIFICATION
+# ============================================================
+
+risk:
+
+  tools:
+
+    get_user:
+      level: LOW
+
+    get_order:
+      level: LOW
+
+    refund:
+      level: MEDIUM
+
+    authenticate_user_session:
+      level: LOW
+
+    verify_permission:
+      level: MEDIUM
+
+    execute_db_write:
+      level: HIGH
