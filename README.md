@@ -1,70 +1,157 @@
-# 🛡️ AgentShield
+# AgentShield
 
-**AgentShield is a security gateway for MCP-based AI agents that evaluates tool requests before execution and records security decisions for auditability.**
+### Security Gateway for MCP-Based AI Agents
 
-It is designed as a layered defensive architecture rather than a single security check. Requests pass through ingress validation, tool/policy validation, state and authorization checks, risk evaluation, egress inspection, and audit logging before a final decision is returned.
+AgentShield is a modular security gateway designed to place a policy-driven security boundary between AI agents and MCP tool execution.
 
-> **Project status:** Phase 1–7 completed.
-> Current implementation is a security-focused development project and demonstration, not a production-certified security product.
+It evaluates tool requests through multiple security layers, including ingress inspection, policy and schema validation, session-state enforcement, authorization, risk assessment, egress inspection, and structured security auditing.
+
+> **Status:** Phase 1–7 implemented
+> **Project type:** Security engineering / AI agent security research project
 
 ---
 
-## 🎯 Why AgentShield?
+## Overview
 
-AI agents increasingly interact with external tools, APIs, files, and services. A tool call therefore needs more than simple authentication.
+As AI agents increasingly interact with external tools and services, tool execution becomes an important security boundary.
 
-AgentShield explores a security gateway model where an agent request is evaluated across multiple independent controls before the underlying tool is allowed to execute.
+AgentShield addresses this boundary by introducing a dedicated gateway that evaluates requests before they reach the underlying MCP server.
 
-The core principle is:
+The architecture follows a defense-in-depth approach:
 
 ```text
-Agent Request
-     │
-     ▼
-┌─────────────────────┐
-│   Ingress Guard     │
-└──────────┬──────────┘
+AI Agent / Client
+       │
+       ▼
+┌──────────────────────┐
+│   AgentShield        │
+│   Security Gateway   │
+└──────────┬───────────┘
+           │
            ▼
-┌─────────────────────┐
-│ Tool / Policy Check │
-└──────────┬──────────┘
+     Ingress Guard
+           │
            ▼
-┌─────────────────────┐
-│ Schema & Parameters │
-│     Validation      │
-└──────────┬──────────┘
+ Tool Allowlist / Policy
+           │
            ▼
-┌─────────────────────┐
-│    State Machine    │
-└──────────┬──────────┘
+ Schema & Parameter
+     Validation
+           │
            ▼
-┌─────────────────────┐
-│ Authorization       │
-│ + Risk Evaluation   │
-└──────────┬──────────┘
+     State Machine
+           │
            ▼
-┌─────────────────────┐
-│   Egress Security   │
-└──────────┬──────────┘
+ Authorization Engine
+           │
            ▼
-┌─────────────────────┐
-│    Audit Logging    │
-└──────────┬──────────┘
+      Risk Engine
+           │
            ▼
-      ALLOW / DENY
+    Egress Inspector
+           │
+           ▼
+     Audit Logger
+           │
+           ▼
+      MCP Server
+```
+
+Each layer provides an independent security control and contributes to the final request decision.
+
+---
+
+## Security Pipeline
+
+A request entering AgentShield passes through the following stages:
+
+| Layer                    | Responsibility                                     |
+| ------------------------ | -------------------------------------------------- |
+| **Ingress**              | Inspects and validates incoming requests           |
+| **Tool Policy**          | Determines whether the requested tool is permitted |
+| **Schema Validation**    | Validates the structure of tool requests           |
+| **Parameter Validation** | Enforces configured parameter constraints          |
+| **State Machine**        | Controls valid session/action transitions          |
+| **Authorization**        | Evaluates role-based tool permissions              |
+| **Risk Engine**          | Calculates risk level and risk score               |
+| **Egress**               | Inspects outgoing tool responses                   |
+| **Audit**                | Records security decisions and events              |
+
+The architecture intentionally separates these responsibilities to make the security pipeline easier to reason about, test, and extend.
+
+---
+
+# Architecture
+
+```text
+                    ┌─────────────────┐
+                    │   AI Agent /    │
+                    │      Client     │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │     Gateway     │
+                    │ Request Handler │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │ Ingress Guard   │
+                    │ Semantic Match  │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │ Policy Engine   │
+                    │ Schema / Params │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │ State Machine   │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │ Authorization   │
+                    │ Decision Engine │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │   Risk Engine   │
+                    │   Thresholds    │
+                    └────────┬────────┘
+                             │
+                       ┌─────┴─────┐
+                       │           │
+                       ▼           ▼
+                     DENY        ALLOW
+                                   │
+                                   ▼
+                          ┌─────────────────┐
+                          │ Egress Inspector│
+                          └────────┬────────┘
+                                   │
+                                   ▼
+                          ┌─────────────────┐
+                          │   Audit Logger  │
+                          └────────┬────────┘
+                                   │
+                                   ▼
+                          ┌─────────────────┐
+                          │    MCP Server   │
+                          └─────────────────┘
 ```
 
 ---
 
-## 🔐 Security Architecture
+# Core Components
 
-AgentShield is organized into security layers.
+## Ingress Security
 
-### 1. Ingress Security
-
-The ingress layer processes incoming requests before they reach the authorization pipeline.
-
-Components:
+Located in:
 
 ```text
 app/ingress/
@@ -72,18 +159,15 @@ app/ingress/
 └── semantic_matcher.py
 ```
 
-Responsibilities include:
+The ingress layer provides the first security boundary for incoming requests.
 
-* Request inspection
-* Ingress security checks
-* Semantic matching
-* Detection of suspicious request patterns
+Responsibilities include request inspection and semantic matching before requests enter the downstream security pipeline.
 
 ---
 
-### 2. Policy & Tool Validation
+## Policy Enforcement
 
-AgentShield validates whether a requested tool and its parameters conform to the configured security policy.
+Located in:
 
 ```text
 app/policy/
@@ -92,32 +176,57 @@ app/policy/
 └── parameter_validator.py
 ```
 
-This separates:
+Policy enforcement provides configuration-driven controls for:
 
-* Policy loading
-* Schema validation
-* Parameter validation
+* Tool availability
+* Request schemas
+* Required parameters
+* Parameter types
+* Parameter constraints
 
-from the authorization decision itself.
+Policies are defined in:
+
+```text
+policies/policies.yaml
+```
+
+This keeps security rules separate from application logic.
 
 ---
 
-### 3. State Management
+## Session State Management
 
-Agent actions are evaluated within a session state model.
+Located in:
 
 ```text
 app/state/
 └── state_machine.py
 ```
 
-The state layer provides a mechanism for controlling how requests are handled as the session progresses instead of treating every request as completely independent.
+AgentShield uses a state-machine model to represent valid security transitions.
+
+For example:
+
+```text
+UNAUTHENTICATED
+        │
+        ▼
+AUTHENTICATED
+        │
+        ▼
+AUTHORIZED
+        │
+        ▼
+ACTION_EXECUTED
+```
+
+This prevents sensitive operations from being treated as independent requests without considering the current session state.
 
 ---
 
-### 4. Authorization
+## Authorization
 
-Authorization is handled separately from policy parsing and request validation.
+Located in:
 
 ```text
 app/authorization/
@@ -125,22 +234,24 @@ app/authorization/
 └── decision_engine.py
 ```
 
-The authorization pipeline produces a security decision based on the request, identity, policy, and other security signals.
+Authorization determines whether a given role is permitted to invoke a particular tool.
 
-Example decision:
+For example, the current policy distinguishes between roles such as:
 
-```json
-{
-  "authorization": "passed",
-  "decision": "ALLOW"
-}
+```text
+student
+admin
 ```
+
+with different tool permissions.
+
+Unauthorized tool requests are rejected by the gateway.
 
 ---
 
-### 5. Risk Evaluation
+## Risk Assessment
 
-AgentShield includes a dedicated risk layer:
+Located in:
 
 ```text
 app/risk/
@@ -148,53 +259,48 @@ app/risk/
 └── threshold_engine.py
 ```
 
-The risk engine produces a risk level and score that can be incorporated into the final security decision.
+AgentShield separates authorization from risk evaluation.
 
-Example:
-
-```json
-{
-  "risk_level": "LOW",
-  "risk_score": 10
-}
-```
-
-This creates a separation between:
+A request can therefore be:
 
 ```text
-Risk calculation
-       ↓
-Threshold evaluation
-       ↓
-Authorization / decision
+Authorized
+     +
+Risk Evaluated
+     ↓
+Final Security Decision
 ```
+
+Risk classifications currently include levels such as:
+
+```text
+LOW
+MEDIUM
+HIGH
+```
+
+with associated risk scores and threshold-based decisions.
 
 ---
 
-### 6. Egress Security
+## Egress Security
 
-After the authorization pipeline, AgentShield performs an egress security check.
+Located in:
 
 ```text
 app/egress/
 └── egress_inspector.py
 ```
 
-This provides an additional security boundary between the internal decision pipeline and the external/tool-facing response.
+Egress inspection provides a security boundary after the internal authorization and risk pipeline.
 
-Example audit result:
-
-```json
-{
-  "egress": "passed"
-}
-```
+A request that passes authorization can still be subjected to outgoing-response inspection before the result is returned.
 
 ---
 
-### 7. Audit & Observability
+## Audit & Observability
 
-Phase 7 introduced structured security auditing.
+Located in:
 
 ```text
 app/audit/
@@ -202,21 +308,9 @@ app/audit/
 └── audit_logger.py
 ```
 
-Security events capture information such as:
+Phase 7 introduced structured security audit events.
 
-* Timestamp
-* Session ID
-* User/agent role
-* Requested tool
-* Request status
-* Authorization result
-* Risk level
-* Risk score
-* Final decision
-* Egress result
-* Error information
-
-Example:
+An audit event can contain:
 
 ```json
 {
@@ -234,17 +328,56 @@ Example:
 }
 ```
 
-The project also includes a security dashboard:
-
-```text
-app/dashboard.py
-```
-
-which provides a view of security/audit information generated by the gateway.
+This provides traceability for security decisions and supports post-execution analysis.
 
 ---
 
-# 🏗️ Project Structure
+# Security Validation
+
+AgentShield has been tested against authorization and security-policy scenarios during development.
+
+Examples include:
+
+### Authorized request
+
+```text
+HTTP 200
+```
+
+with:
+
+```text
+allowlist       → passed
+schema          → passed
+parameters      → passed
+state           → passed
+authorization   → passed
+risk            → passed
+egress          → passed
+decision        → ALLOW
+```
+
+### Unauthorized request
+
+Security-policy violations were validated to return:
+
+```text
+HTTP 403
+```
+
+Examples included attempts to:
+
+* Invoke restricted tools using an unauthorized role
+* Bypass role-based authorization
+* Use invalid or unknown roles
+* Manipulate role casing
+* Access privileged operations without authorization
+
+These tests form part of the project's Phase 5 security validation.
+
+---
+
+# Project Structure
 
 ```text
 AgentShield/
@@ -278,6 +411,7 @@ AgentShield/
 │   │   └── schema_validator.py
 │   │
 │   ├── risk/
+│   │   ├── __init__.py
 │   │   ├── risk_engine.py
 │   │   └── threshold_engine.py
 │   │
@@ -293,124 +427,37 @@ AgentShield/
 ├── policies/
 │   └── policies.yaml
 │
-├── requirements.txt
 ├── .env.example
 ├── .gitignore
+├── requirements.txt
 └── README.md
 ```
 
 ---
 
-# 🧩 Gateway Flow
+# Development Roadmap
 
-A typical request follows this security pipeline:
-
-```text
-                ┌───────────────┐
-                │ Agent / Client│
-                └───────┬───────┘
-                        │
-                        ▼
-                ┌───────────────┐
-                │    Gateway    │
-                └───────┬───────┘
-                        │
-                        ▼
-                ┌───────────────┐
-                │ Ingress Guard │
-                └───────┬───────┘
-                        │
-                        ▼
-                ┌───────────────┐
-                │ Policy Loader  │
-                │ Schema Check   │
-                │ Parameter Check│
-                └───────┬───────┘
-                        │
-                        ▼
-                ┌───────────────┐
-                │ State Machine │
-                └───────┬───────┘
-                        │
-                        ▼
-                ┌───────────────┐
-                │ Authorization │
-                └───────┬───────┘
-                        │
-                        ▼
-                ┌───────────────┐
-                │ Risk Engine   │
-                └───────┬───────┘
-                        │
-                 ┌──────┴──────┐
-                 │             │
-              DENY            ALLOW
-                 │             │
-                 │             ▼
-                 │      ┌──────────────┐
-                 │      │ Egress Check │
-                 │      └──────┬───────┘
-                 │             │
-                 └──────┬──────┘
-                        ▼
-                ┌───────────────┐
-                │ Audit Logger  │
-                └───────┬───────┘
-                        │
-                        ▼
-                    Response
-```
+| Phase | Capability                     |  Status |
+| :---: | ------------------------------ | :-----: |
+|   1   | Foundation & Gateway           |    ✅    |
+|   2   | Ingress Security               |    ✅    |
+|   3   | MCP Tool Security              |    ✅    |
+|   4   | Session State Machine          |    ✅    |
+|   5   | Authorization & Risk           |    ✅    |
+|   6   | Egress Security                |    ✅    |
+|   7   | Audit & Dashboard              |    ✅    |
+|   8   | Extended Security Capabilities | Planned |
 
 ---
 
-# 📋 Development Phases
+# Installation
 
-| Phase   | Component                          | Status      |
-| ------- | ---------------------------------- | ----------- |
-| Phase 1 | Foundation / Gateway               | ✅ Completed |
-| Phase 2 | Ingress Guard                      | ✅ Completed |
-| Phase 3 | Tool & Policy Security             | ✅ Completed |
-| Phase 4 | State Machine                      | ✅ Completed |
-| Phase 5 | Authorization & Risk Engine        | ✅ Completed |
-| Phase 6 | Egress Security                    | ✅ Completed |
-| Phase 7 | Audit Logging & Security Dashboard | ✅ Completed |
-| Phase 8 | Future development                 | 🔜 Planned  |
+## Requirements
 
----
-
-# 🧪 Security Validation
-
-During development, the gateway was tested using security-focused request scenarios.
-
-A successful authorized request produced a result containing:
-
-```text
-status          → success
-authorization   → passed
-risk_level      → LOW
-risk_score      → 10
-decision        → ALLOW
-egress          → passed
-```
-
-Unauthorized scenarios were also tested and returned:
-
-```text
-HTTP 403
-```
-
-The project therefore demonstrates both successful authorization and denial paths through the gateway.
-
----
-
-# 🛠️ Local Development
-
-## Prerequisites
-
-* Python
+* Python 3.x
 * Git
-* A virtual environment
-* MCP-compatible development environment
+* Windows, Linux, or macOS
+* Python virtual environment
 
 ## Clone
 
@@ -419,9 +466,9 @@ git clone https://github.com/Lxlit12/AgentShield.git
 cd AgentShield
 ```
 
-## Create a virtual environment
+## Create virtual environment
 
-### Windows PowerShell
+### Windows
 
 ```powershell
 python -m venv venv
@@ -441,145 +488,123 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Configuration
+---
 
-Copy the example environment file if environment variables are required:
+# Configuration
 
-```powershell
-Copy-Item .env.example .env
+AgentShield uses policy configuration stored under:
+
+```text
+policies/policies.yaml
 ```
 
-The `.env` file is intentionally excluded from Git.
+Environment-specific configuration can be placed in:
+
+```text
+.env
+```
+
+A template is provided as:
+
+```text
+.env.example
+```
+
+Sensitive environment files are excluded from version control through `.gitignore`.
 
 ---
 
-# 🚦 Running the Project
+# Running Locally
 
-The repository contains two major runtime components:
+The repository contains the AgentShield gateway and a demonstration MCP server.
 
-```text
-AgentShield Gateway
-        │
-        ▼
-MCP Server
-```
-
-The main application entry point is:
+Main gateway:
 
 ```text
 app/main.py
 ```
 
-The demonstration MCP server is:
+MCP server:
 
 ```text
 mcp_server/server.py
 ```
 
-The exact runtime command depends on the current local development configuration.
+The exact startup configuration depends on the local development environment and installed dependencies.
 
 ---
 
-# 📊 Audit Events
-
-Phase 7 introduced structured audit events so security decisions can be inspected after execution.
-
-A typical event contains:
-
-```text
-timestamp
-session_id
-role
-tool
-status
-authorization
-risk_level
-risk_score
-decision
-egress
-error
-```
-
-This makes it possible to answer questions such as:
-
-* Which session made the request?
-* Which tool was requested?
-* Was authorization successful?
-* What risk level was assigned?
-* What decision was made?
-* Did the egress check pass?
-* Was an error generated?
-
----
-
-# 🔒 Security Design Principles
-
-AgentShield is built around several security engineering principles:
+# Design Principles
 
 ### Defense in Depth
 
-Multiple security layers evaluate the request instead of relying on a single control.
+Security is distributed across multiple independent layers.
+
+### Least Privilege
+
+Roles are granted access only to explicitly permitted tools.
+
+### Policy-Driven Controls
+
+Security rules are maintained in policy configuration rather than being entirely hard-coded.
 
 ### Separation of Concerns
 
-Ingress, policy validation, authorization, risk evaluation, egress inspection, and auditing are implemented as separate components.
+Each security capability has a dedicated module.
 
-### Policy-Driven Security
+### Explicit Decisions
 
-Security behavior is represented through policy configuration rather than embedding every rule directly into the request handler.
-
-### Explicit Authorization
-
-A tool request must pass the authorization pipeline before it can proceed.
-
-### Risk-Aware Decisions
-
-Authorization is complemented by a risk score and risk level.
+Security decisions expose authorization and risk information rather than silently executing tool calls.
 
 ### Auditability
 
-Security decisions are recorded as structured events that can be inspected later.
+Important security events are recorded in structured form.
+
+### Extensibility
+
+Individual security layers can be extended without redesigning the entire gateway.
 
 ---
 
-# ⚠️ Current Limitations
+# Limitations
 
-This repository represents a **development-stage security architecture and implementation**.
+AgentShield is currently a **development and security-engineering project**.
 
-It should not currently be treated as:
+It should not be interpreted as:
 
 * A production security certification
-* A guarantee that all prompt-injection attacks are detected
-* A complete security solution for arbitrary MCP deployments
-* A substitute for authentication, network security, sandboxing, or infrastructure security
+* A guarantee of complete protection against prompt injection
+* A complete MCP security standard
+* A replacement for infrastructure security
+* A replacement for authentication or network-level controls
+* Proof that arbitrary AI-agent attacks can be detected
 
-Security controls should be independently tested before deployment in a production environment.
+Production deployments would require additional security review, threat modeling, testing, monitoring, and operational controls.
 
 ---
 
-# 🔮 Future Work
+# Future Development
 
-Potential future development includes:
+Potential areas for future work include:
 
 * Expanded adversarial testing
-* More granular policy controls
-* Stronger session and identity management
-* More detailed audit analytics
+* Automated security regression tests
 * Policy versioning
-* Security metrics and reporting
-* Automated regression tests
+* Improved identity and session management
+* Expanded MCP tool coverage
+* Security metrics and analytics
 * Containerized deployment
-* CI/CD security checks
-* Additional MCP integrations
-* Phase 8 security capabilities
+* CI/CD security validation
+* Enhanced dashboard capabilities
+* Additional threat-detection mechanisms
 
 ---
 
-# 📚 Project Goals
+# Project Objective
 
-AgentShield is primarily a learning and engineering project focused on understanding how a security boundary can be constructed around AI-agent tool execution.
+AgentShield explores how a dedicated security gateway can provide a structured control boundary around AI-agent tool execution.
 
-The project explores:
+The project brings together:
 
 ```text
 AI Agents
@@ -590,52 +615,55 @@ Policy Enforcement
     +
 Authorization
     +
-Risk Evaluation
+Risk Assessment
     +
-Egress Controls
+Egress Inspection
     +
 Auditability
 ```
 
-The objective is to demonstrate how these controls can be composed into a single security gateway.
+The result is a modular security architecture intended for experimentation, learning, and further security engineering development.
 
 ---
 
-# 👤 Author
+# Author
 
 **Lalit Aditya**
 
 GitHub:
 https://github.com/Lxlit12
 
-Project:
+Repository:
 https://github.com/Lxlit12/AgentShield
 
 ---
 
-## ⭐ Project Status
+## Project Status
 
-**AgentShield — Phase 1 through Phase 7 complete.**
+**Phase 1–7 completed.**
 
-Current milestone:
+Current architecture:
 
 ```text
-Security Gateway
-       ↓
 Ingress
-       ↓
+   ↓
 Policy
-       ↓
+   ↓
+Schema
+   ↓
+Parameters
+   ↓
 State
-       ↓
+   ↓
 Authorization
-       ↓
+   ↓
 Risk
-       ↓
+   ↓
 Egress
-       ↓
+   ↓
 Audit
-       ↓
+   ↓
 Dashboard
 ```
 
+**Next milestone: Phase 8**
