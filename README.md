@@ -639,4 +639,3 @@ Audit
 Dashboard
 ```
 
-**Next milestone: Phase 8**
